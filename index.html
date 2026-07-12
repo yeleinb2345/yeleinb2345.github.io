@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Core | 个人科幻博客</title>
+    <style>
+        :root {
+            --glow-color: #00f3ff;
+            --bg-color: #0a0a12;
+            --panel-bg: rgba(16, 16, 32, 0.75);
+            --border-color: rgba(0, 243, 255, 0.2);
+            --text-color: #ade8f4;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body, html {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* 3D雪花粒子背景 Canvas */
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            pointer-events: auto; /* 允许点击交互 */
+        }
+
+        /* 核心布局包装器 */
+        .app-container {
+            position: relative;
+            z-index: 2;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 30px;
+        }
+
+        /* 侧边栏个人信息 (大厂质感卡片) */
+        aside {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 30px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.05);
+            height: fit-content;
+            position: sticky;
+            top: 40px;
+            text-align: center;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+        
+        aside:hover {
+            border-color: var(--glow-color);
+            box-shadow: 0 0 40px rgba(0, 243, 255, 0.2);
+        }
+
+        .avatar-wrapper {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px;
+            border-radius: 50%;
+            padding: 4px;
+            background: linear-gradient(135deg, var(--glow-color), #9d4edd);
+        }
+
+        .avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #fff;
+        }
+
+        .status-dot {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            width: 16px;
+            height: 16px;
+            background: #00ff66;
+            border-radius: 50%;
+            border: 3px solid var(--bg-color);
+            box-shadow: 0 0 10px #00ff66;
+        }
+
+        /* 核心内容区 */
+        main {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        /* 9宫格纯色背景画中画放映厅 */
+        .gallery-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(20px);
+        }
+
+        .gallery-title {
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            color: #fff;
+            text-shadow: 0 0 10px var(--glow-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .gallery-item {
+            position: relative;
+            background: #121225; /* 纯色背景暗舱 */
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 1 / 1;
+            border: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .gallery-item:hover {
+            transform: scale(1.03);
+            border-color: var(--glow-color);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* 保持原图比例不裁剪 */
+            transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        .gallery-item:hover img {
+            transform: scale(1.1);
+        }
+
+        /* 悬浮画中画扫光特效 */
+        .gallery-item::after {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%; width: 200%; height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(0, 243, 255, 0.1), transparent);
+            transform: rotate(45deg);
+            transition: 0.6s;
+            opacity: 0;
+        }
+        .gallery-item:hover::after {
+            opacity: 1;
+            left: 120%;
+        }
+
+        /* 文章展区 */
+        .article-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 30px;
+            backdrop-filter: blur(20px);
+            transition: all 0.3s ease;
+        }
+
+        .article-card h2 {
+            color: #fff;
+            margin-bottom: 15px;
+        }
+
+        .article-body {
+            line-height: 1.8;
+            color: #c4fff7;
+            user-select: text;
+        }
+
+        /* 大厂级高级后台编辑器面板 (隐藏/路由触发) */
+        .admin-panel {
+            display: none;
+            background: rgba(10, 10, 25, 0.95);
+            border: 2px solid var(--glow-color);
+            box-shadow: 0 0 50px rgba(0, 243, 255, 0.3);
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%; max-width: 600px;
+            border-radius: 16px;
+            padding: 30px;
+            z-index: 100;
+            backdrop-filter: blur(30px);
+        }
+
+        .admin-active .admin-panel {
+            display: block;
+            animation: panelGlitch 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+        }
+
+        @keyframes panelGlitch {
+            0% { transform: translate(-50%, -48%) scale(0.95); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .admin-input, .admin-textarea {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            outline: none;
+        }
+        .admin-textarea { height: 150px; resize: none; }
+        .admin-input:focus, .admin-textarea:focus { border-color: var(--glow-color); }
+
+        .btn-cyber {
+            background: linear-gradient(90deg, #00f3ff, #9d4edd);
+            border: none; color: #fff;
+            padding: 12px 24px; border-radius: 8px;
+            cursor: pointer; font-weight: bold;
+            letter-spacing: 1px; width: 100%;
+            transition: transform 0.1s;
+        }
+        .btn-cyber:active { transform: scale(0.98); }
+
+        /* 评论区挂载面板 */
+        .comments-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(20px);
+        }
+
+        /* 各种辅助响应式 */
+        @media(max-width: 768px) {
+            .app-container { grid-template-columns: 1fr; }
+            aside { position: relative; top: 0; }
+            .gallery-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="particle-canvas"></canvas>
+
+    <div class="app-container">
+        <aside>
+            <div class="avatar-wrapper">
+                <img src="image.png" alt="Avatar" class="avatar">
+                <div class="status-dot"></div>
+            </div>
+            <h2 style="color: #fff; margin-bottom: 10px;">Yelei</h2>
+            <p style="font-size: 0.85rem; opacity: 0.7; margin-bottom: 20px;">@yeleinb2345</p>
+            <div style="text-align: left; font-size: 0.9rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                <p>⚡ 状态: 矩阵同步中</p>
+                <p style="margin-top: 5px;">🔗 后台: 在URL后输入 <span style="color:var(--glow-color)">#admin</span> 即可登入</p>
+            </div>
+        </aside>
+
+        <main>
+            <section class="gallery-panel">
+                <div class="gallery-title">
+                    <span>🎬 Media Screening / 放映厅</span>
+                    <span style="font-size: 0.8rem; color: var(--glow-color);">Pure BG • Auto Ratio</span>
+                </div>
+                <div class="gallery-grid">
+                    <div class="gallery-item"><img src="184E9FBB-0318-45D9-9A0E-906E3D8CC19E.png" alt="Img 1"></div>
+                    <div class="gallery-item"><img src="3E351C11-97A3-4E3E-B85E-557B0C874153.png" alt="Img 2"></div>
+                    <div class="gallery-item"><img src="56C10066-C883-4E76-895B-6FEB7875DB1C.png" alt="Img 3"></div>
+                    <div class="gallery-item"><img src="57891B66-E9EF-4A15-A23E-DA4EE2CCFEF3.png" alt="Img 4"></div>
+                    <div class="gallery-item"><img src="68BB7C30-7AF9-4DBC-B6C7-C951B2F0399E.png" alt="Img 5"></div>
+                    <div class="gallery-item"><img src="B309FF53-D5AF-4A4D-96E6-4A1B7341875F.png" alt="Img 6"></div>
+                    <div class="gallery-item"><img src="C90BBE21-8F58-435C-A7E1-AFD370EA7D4A.png" alt="Img 7"></div>
+                    <div class="gallery-item"><img src="D85F20DF-48DC-4A05-B8E7-3F8369A02F4D.png" alt="Img 8"></div>
+                    <div class="gallery-item"><img src="E74189CD-7603-4480-80D2-9DE4C8AE8486.png" alt="Img 9"></div>
+                </div>
+            </section>
+
+            <div id="articles-container">
+                <article class="article-card">
+                    <h2>Hello Cyber World</h2>
+                    <div class="article-body">
+                        欢迎来到我的全新智能博客终端。此系统基于高级核心环境构建，自带深度雪花量子引力场交互和全链路流式发布技术。
+                    </div>
+                </article>
+            </div>
+
+            <section class="comments-panel">
+                <script src="https://giscus.app/client.js"
+                    data-repo="yeleinb2345/talk"
+                    data-repo-id="R_kgDOTTQ_YQ"
+                    data-category="Announcements"
+                    data-category-id="DIC_kwDOTTQ_Yc4DA1H_"
+                    data-mapping="pathname"
+                    data-strict="0"
+                    data-reactions-enabled="1"
+                    data-emit-metadata="0"
+                    data-input-position="top"
+                    data-theme="dark"
+                    data-lang="zh-CN"
+                    data-loading="lazy"
+                    crossorigin="anonymous"
+                    async>
+                </script>
+            </section>
+        </main>
+    </div>
+
+    <div class="admin-panel" id="adminPanel">
+        <h3 style="color:#fff; margin-bottom: 20px; display:flex; justify-content:space-between;">
+            <span>🛡️ 核心管理控制台</span>
+            <span style="cursor:pointer; color:red;" onclick="location.hash=''">[关闭]</span>
+        </h3>
+        <div id="loginForm">
+            <input type="text" id="username" class="admin-input" placeholder="控制台账号">
+            <input type="password" id="password" class="admin-input" placeholder="加密令牌(密码)">
+            <button class="btn-cyber" onclick="handleLogin()">验 证 登 入</button>
+        </div>
+        <div id="editorForm" style="display: none;">
+            <input type="text" id="postTitle" class="admin-input" placeholder="文章标题...">
+            <textarea id="postContent" class="admin-textarea" placeholder="在此输入 Markdown 或 HTML 内容..."></textarea>
+            <button class="btn-cyber" onclick="handlePublish()">发 布 至 主 页</button>
+        </div>
+    </div>
+
+    <script>
+        // === 1. 3D交互雪花粒子系统 ===
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Snowflake {
+            constructor(x, y, isBlast = false) {
+                this.x = x || Math.random() * canvas.width;
+                this.y = y || (isBlast ? y : Math.random() * -canvas.height);
+                this.size = Math.random() * 3 + 1;
+                this.speedX = isBlast ? (Math.random() - 0.5) * 15 : (Math.random() - 0.5) * 1;
+                this.speedY = isBlast ? (Math.random() - 0.5) * 15 : Math.random() * 1.5 + 0.5;
+                this.opacity = Math.random() * 0.6 + 0.4;
+                this.life = isBlast ? 60 : 999; 
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.life < 999) this.life--;
+                
+                // 边界回收
+                if (this.y > canvas.height) {
+                    this.y = -10;
+                    this.x = Math.random() * canvas.width;
+                }
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0, 243, 255, ${this.opacity * (this.life / 60)})`;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#00f3ff';
+                ctx.fill();
+                ctx.shadowBlur = 0; // 重置
+            }
+        }
+
+        // 初始化基础雪花
+        for (let i = 0; i < 80; i++) {
+            particles.push(new Snowflake());
+        }
+
+        // 点击弹动雪花交互
+        window.addEventListener('click', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
+            for (let i = 0; i < 25; i++) {
+                particles.push(new Snowflake(e.clientX, e.clientY, true));
+            }
+        });
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles = particles.filter(p => p.life > 0);
+            while(particles.filter(p => p.life === 999).length < 80) {
+                particles.push(new Snowflake());
+            }
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // === 2. 伪路由与后台逻辑 (#admin) ===
+        function checkHash() {
+            if (location.hash === '#admin') {
+                document.body.classList.add('admin-active');
+            } else {
+                document.body.classList.remove('admin-active');
+            }
+        }
+        window.addEventListener('hashchange', checkHash);
+        window.addEventListener('load', checkHash);
+
+        // 登录处理
+        function handleLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            if (u === 'yelei' && p === 'yelei') {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('editorForm').style.display = 'block';
+            } else {
+                alert('⚡ 密钥校验失败。系统锁死！');
+            }
+        }
+
+        // 发布文章处理
+        function handlePublish() {
+            const title = document.getElementById('postTitle').value;
+            const content = document.getElementById('postContent').value;
+            if (!title || !content) return alert('不可发布空数据元');
+
+            const container = document.getElementById('articles-container');
+            const newArticle = document.createElement('article');
+            newArticle.className = 'article-card';
+            newArticle.style.marginTop = '30px';
+            newArticle.innerHTML = `
+                <h2>${title}</h2>
+                <div class="article-body">${content}</div>
+            `;
+            container.insertBefore(newArticle, container.firstChild);
+            
+            // 重置与关闭
+            document.getElementById('postTitle').value = '';
+            document.getElementById('postContent').value = '';
+            location.hash = ''; 
+            alert('🎉 信号已同步！文章成功广播发布。');
+        }
+    </script>
+</body>
+</html>

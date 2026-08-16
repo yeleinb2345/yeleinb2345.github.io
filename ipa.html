@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPA 一键重签名助手</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #0f1115;
+    color: #e5e7eb;
+    min-height: 100vh;
+    padding: 24px;
+    line-height: 1.5;
+  }
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    background: #1a1d24;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  }
+  h1 {
+    font-size: 22px;
+    margin-bottom: 6px;
+    color: #fff;
+  }
+  .subtitle {
+    color: #9ca3af;
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+  .section {
+    margin-bottom: 22px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    color: #9ca3af;
+    margin-bottom: 6px;
+  }
+  .file-box {
+    border: 2px dashed #374151;
+    border-radius: 12px;
+    padding: 18px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #111318;
+  }
+  .file-box:hover, .file-box.dragover {
+    border-color: #3b82f6;
+    background: #1e293b;
+  }
+  .file-box.has-file {
+    border-color: #10b981;
+    background: #064e3b20;
+  }
+  .file-name {
+    font-size: 14px;
+    color: #e5e7eb;
+    margin-top: 6px;
+    word-break: break-all;
+  }
+  input[type="file"] { display: none; }
+  input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid #374151;
+    background: #111318;
+    color: #e5e7eb;
+    font-size: 14px;
+  }
+  input:focus {
+    outline: none;
+    border-color: #3b82f6;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: #3b82f6;
+    color: white;
+    width: 100%;
+    margin-top: 8px;
+  }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled {
+    background: #374151;
+    cursor: not-allowed;
+  }
+  .btn-secondary {
+    background: #1f2937;
+    color: #e5e7eb;
+    border: 1px solid #374151;
+  }
+  .btn-secondary:hover { background: #374151; }
+  .output {
+    margin-top: 24px;
+    display: none;
+  }
+  .output.show { display: block; }
+  pre {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 16px;
+    font-size: 13px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #a5d6ff;
+  }
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .tip {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 8px;
+  }
+  .status {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    display: none;
+  }
+  .status.ok {
+    background: #064e3b30;
+    color: #34d399;
+    display: block;
+  }
+  .status.err {
+    background: #7f1d1d30;
+    color: #f87171;
+    display: block;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>IPA 重签名助手</h1>
+    <p class="subtitle">导入 IPA + p12 + mobileprovision，一键生成 zsign 命令和脚本</p>
+
+    <!-- IPA -->
+    <div class="section">
+      <label>1. 选择 IPA 文件</label>
+      <div class="file-box" id="ipaBox" onclick="document.getElementById('ipa').click()">
+        <div>点击或拖拽 IPA 到这里</div>
+        <div class="file-name" id="ipaName"></div>
+      </div>
+      <input type="file" id="ipa" accept=".ipa">
+    </div>
+
+    <!-- P12 -->
+    <div class="section">
+      <label>2. 选择 p12 证书</label>
+      <div class="file-box" id="p12Box" onclick="document.getElementById('p12').click()">
+        <div>点击或拖拽 .p12 到这里</div>
+        <div class="file-name" id="p12Name"></div>
+      </div>
+      <input type="file" id="p12" accept=".p12,.pfx">
+    </div>
+
+    <!-- Provision -->
+    <div class="section">
+      <label>3. 选择 mobileprovision</label>
+      <div class="file-box" id="provBox" onclick="document.getElementById('prov').click()">
+        <div>点击或拖拽 .mobileprovision 到这里</div>
+        <div class="file-name" id="provName"></div>
+      </div>
+      <input type="file" id="prov" accept=".mobileprovision">
+    </div>
+
+    <!-- 密码 + 可选参数 -->
+    <div class="section">
+      <label>p12 密码</label>
+      <input type="password" id="password" placeholder="输入证书密码（可留空）" value="">
+    </div>
+
+    <div class="row section">
+      <div>
+        <label>新 Bundle ID（可选）</label>
+        <input type="text" id="bundleId" placeholder="例如 com.example.app">
+      </div>
+      <div>
+        <label>新显示名称（可选）</label>
+        <input type="text" id="appName" placeholder="例如 我的应用">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="generateBtn" onclick="generate()" disabled>
+      生成 zsign 命令 & 脚本
+    </button>
+
+    <div class="status" id="status"></div>
+
+    <div class="output" id="output">
+      <label style="margin-bottom:8px">生成的命令（直接复制到终端运行）</label>
+      <pre id="cmd"></pre>
+
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="copyCmd()">复制命令</button>
+        <button class="btn btn-secondary" onclick="downloadBat()">下载 Windows .bat</button>
+        <button class="btn btn-secondary" onclick="downloadSh()">下载 macOS/Linux .sh</button>
+      </div>
+
+      <p class="tip">
+        使用前请确保已安装 zsign，并把三个文件和生成的脚本放在同一目录下运行。
+      </p>
+    </div>
+  </div>
+
+<script>
+  const files = { ipa: null, p12: null, prov: null };
+
+  function setupDrop(boxId, inputId, key, nameId) {
+    const box = document.getElementById(boxId);
+    const input = document.getElementById(inputId);
+    const nameEl = document.getElementById(nameId);
+
+    input.addEventListener('change', e => {
+      if (e.target.files[0]) {
+        files[key] = e.target.files[0];
+        nameEl.textContent = files[key].name;
+        box.classList.add('has-file');
+        checkReady();
+      }
+    });
+
+    box.addEventListener('dragover', e => {
+      e.preventDefault();
+      box.classList.add('dragover');
+    });
+    box.addEventListener('dragleave', () => box.classList.remove('dragover'));
+    box.addEventListener('drop', e => {
+      e.preventDefault();
+      box.classList.remove('dragover');
+      if (e.dataTransfer.files[0]) {
+        files[key] = e.dataTransfer.files[0];
+        nameEl.textContent = files[key].name;
+        box.classList.add('has-file');
+        // 同步到 input（方便后续）
+        const dt = new DataTransfer();
+        dt.items.add(files[key]);
+        input.files = dt.files;
+        checkReady();
+      }
+    });
+  }
+
+  setupDrop('ipaBox', 'ipa', 'ipa', 'ipaName');
+  setupDrop('p12Box', 'p12', 'p12', 'p12Name');
+  setupDrop('provBox', 'prov', 'prov', 'provName');
+
+  function checkReady() {
+    const ready = files.ipa && files.p12 && files.prov;
+    document.getElementById('generateBtn').disabled = !ready;
+  }
+
+  function generate() {
+    const pwd = document.getElementById('password').value;
+    const bid = document.getElementById('bundleId').value.trim();
+    const name = document.getElementById('appName').value.trim();
+
+    // 假设三个文件和脚本放在同一目录
+    let cmd = `zsign -k "${files.p12.name}" -m "${files.prov.name}" -o "signed_${files.ipa.name}"`;
+    if (pwd) cmd += ` -p "${pwd}"`;
+    if (bid) cmd += ` -b "${bid}"`;
+    if (name) cmd += ` -n "${name}"`;
+    cmd += ` "${files.ipa.name}"`;
+
+    document.getElementById('cmd').textContent = cmd;
+    document.getElementById('output').classList.add('show');
+
+    const status = document.getElementById('status');
+    status.className = 'status ok';
+    status.textContent = '命令已生成。请把三个文件和脚本放在同一文件夹，然后运行。';
+  }
+
+  function copyCmd() {
+    const text = document.getElementById('cmd').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const status = document.getElementById('status');
+      status.className = 'status ok';
+      status.textContent = '命令已复制到剪贴板';
+    });
+  }
+
+  function downloadBat() {
+    const cmd = document.getElementById('cmd').textContent;
+    const content = `@echo off\r\nchcp 65001 >nul\r\necho 正在签名...\r\n${cmd}\r\nif %errorlevel% equ 0 (\r\n  echo 签名成功！\r\n) else (\r\n  echo 签名失败，请检查证书和描述文件是否匹配。\r\n)\r\npause\r\n`;
+    downloadFile('
